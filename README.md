@@ -14,8 +14,6 @@ A modern, responsive **weather web application** that provides real-time weather
 * View temperature, wind speed, humidity, and min/max temperature
 * Get a fun **AI-generated weather report** (Gemini-powered)
 
-This project was developed as part of an **internship assignment at CODTECH IT SOLUTIONS**.
-
 ## 🛠️ Tech Stack
 
 * **HTML5**
