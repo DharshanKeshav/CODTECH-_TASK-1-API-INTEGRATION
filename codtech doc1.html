@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Weather Hub</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        brandBlue: '#0f172a', 
+                        brandOrange: '#f97316', 
+                        brandLight: '#f8fafc',
+                        brandSky: '#bae6fd'
+                    },
+                    animation: {
+                        'float': 'float 3s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #f97316;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .modal-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .modal-fade-out { animation: fadeOut 0.3s ease-in forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        @keyframes fadeOut { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.95); } }
+        
+        .weather-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f0f9ff 100%);
+        }
+    </style>
+</head>
+<body class="bg-brandLight text-slate-800 flex flex-col min-h-screen relative">
+
+    <header class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-40">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+            <div class="flex items-center gap-3">
+                <div class="bg-brandOrange text-white p-2 rounded-lg shadow-lg">
+                    <i class="fa-solid fa-cloud-sun text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-brandBlue">Global Weather Hub</h1>
+                    <p class="text-gray-500 text-xs font-medium uppercase tracking-wider">Live Open-Meteo Data</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow w-full max-w-4xl mx-auto px-4 sm:px-6 py-8 z-10">
+
+        <section class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+            <div class="flex flex-col sm:flex-row gap-3">
+                <div class="relative flex-grow">
+                    <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <i class="fa-solid fa-magnifying-glass text-gray-400"></i>
+                    </div>
+                    <input type="text" id="cityInput" 
+                        class="block w-full pl-11 pr-4 py-4 border border-gray-200 rounded-xl bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brandOrange focus:border-transparent transition-all" 
+                        placeholder="Enter city name (e.g. London, Tokyo)...">
+                </div>
+                <button onclick="handleSearch()" class="bg-brandBlue hover:bg-slate-800 text-white font-semibold py-4 px-8 rounded-xl transition-colors shadow-md">
+                    Search
+                </button>
+                <button onclick="getUserLocation()" class="bg-gray-100 hover:bg-gray-200 text-brandBlue py-4 px-5 rounded-xl transition-colors" title="Use my location">
+                    <i class="fa-solid fa-location-crosshairs text-lg"></i>
+                </button>
+            </div>
+        </section>
+
+        <div id="loader" class="hidden flex flex-col justify-center items-center py-12">
+            <div class="loader mb-4"></div>
+            <p class="text-gray-500 font-medium animate-pulse">Scanning satellites...</p>
+        </div>
+
+        <div id="errorBox" class="hidden bg-red-50 border-l-4 border-red-500 p-4 mb-8 rounded-r-lg">
+            <div class="flex items-center">
+                <i class="fa-solid fa-triangle-exclamation text-red-500 mr-3 text-xl"></i>
+                <div>
+                    <h3 class="text-red-800 font-bold">Location Not Found</h3>
+                    <p id="errorText" class="text-red-700 text-sm">Please check the spelling and try again.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="weatherContainer" class="hidden space-y-6">
+            
+            <div class="weather-card rounded-3xl shadow-lg border border-blue-50 p-8 relative overflow-hidden">
+                <div class="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-brandOrange opacity-10 rounded-full blur-3xl"></div>
+                <div class="absolute bottom-0 left-0 -mb-10 -ml-10 w-40 h-40 bg-brandBlue opacity-10 rounded-full blur-3xl"></div>
+
+                <div class="relative z-10 flex flex-col md:flex-row justify-between items-center text-center md:text-left">
+                    
+                    <div class="mb-6 md:mb-0">
+                        <div class="flex items-center justify-center md:justify-start gap-2 mb-1">
+                            <i class="fa-solid fa-location-dot text-brandOrange"></i>
+                            <h2 id="cityName" class="text-3xl font-bold text-brandBlue tracking-tight">City Name</h2>
+                        </div>
+                        <p id="currentDate" class="text-gray-500 font-medium">Monday, 12 Oct</p>
+                        <span id="weatherDesc" class="inline-block mt-3 px-3 py-1 bg-white border border-blue-100 rounded-full text-sm font-semibold text-blue-600 shadow-sm">
+                            Clear Sky
+                        </span>
+                    </div>
+
+                    <div class="flex items-center gap-6">
+                        <div class="text-brandBlue">
+                            <i id="weatherIcon" class="fa-solid fa-sun text-6xl md:text-7xl animate-float text-yellow-500 drop-shadow-lg"></i>
+                        </div>
+                        <div>
+                            <span id="tempValue" class="text-6xl md:text-7xl font-bold text-brandBlue">24</span>
+                            <span class="text-3xl text-gray-400 font-light align-top">°C</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 border-t border-gray-200/60 pt-6 flex justify-center md:justify-start">
+                    <button onclick="openAIModal()" class="group flex items-center gap-2 bg-gradient-to-r from-brandBlue to-slate-800 text-white px-5 py-2.5 rounded-full hover:shadow-lg hover:scale-105 transition-all duration-300">
+                        <i class="fa-solid fa-wand-magic-sparkles text-brandOrange group-hover:rotate-12 transition-transform"></i>
+                        <span class="font-medium text-sm">Ask AI Weatherman</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+                    <div class="bg-blue-50 p-3 rounded-full mb-3 text-blue-600">
+                        <i class="fa-solid fa-wind text-xl"></i>
+                    </div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Wind Speed</p>
+                    <p id="windValue" class="text-xl font-bold text-brandBlue mt-1">12 km/h</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+                    <div class="bg-orange-50 p-3 rounded-full mb-3 text-brandOrange">
+                        <i class="fa-solid fa-droplet text-xl"></i>
+                    </div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Humidity</p>
+                    <p id="humidityValue" class="text-xl font-bold text-brandBlue mt-1">45%</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+                    <div class="bg-purple-50 p-3 rounded-full mb-3 text-purple-600">
+                        <i class="fa-solid fa-temperature-arrow-up text-xl"></i>
+                    </div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Max Temp</p>
+                    <p id="maxTempValue" class="text-xl font-bold text-brandBlue mt-1">26°C</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center hover:shadow-md transition-shadow">
+                    <div class="bg-teal-50 p-3 rounded-full mb-3 text-teal-600">
+                        <i class="fa-solid fa-temperature-arrow-down text-xl"></i>
+                    </div>
+                    <p class="text-gray-500 text-xs uppercase font-bold">Min Temp</p>
+                    <p id="minTempValue" class="text-xl font-bold text-brandBlue mt-1">18°C</p>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <div id="aiModal" class="fixed inset-0 bg-black bg-opacity-60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div id="aiModalContent" class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
+            <div class="bg-brandBlue px-6 py-5 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/10 p-2 rounded-lg">
+                        <i class="fa-solid fa-robot text-brandOrange"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-white font-bold text-lg">AI Weather Report</h3>
+                        <p class="text-blue-200 text-xs">Powered by Gemini</p>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white transition bg-white/5 hover:bg-white/10 p-2 rounded-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="p-8">
+                <div id="modalLoader" class="hidden flex flex-col items-center justify-center py-4">
+                    <div class="loader mb-4 border-gray-200 border-t-brandOrange"></div>
+                    <p class="text-gray-500 animate-pulse text-sm font-medium">Analyzing atmospheric pressure...</p>
+                </div>
+
+                <div id="modalTextContent" class="text-gray-700 leading-relaxed space-y-4">
+                    </div>
+            </div>
+
+            <div class="bg-gray-50 px-6 py-4 border-t border-gray-100 flex justify-end">
+                <button onclick="closeModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-brandBlue text-white border-t border-gray-700 mt-auto">
+        <div class="max-w-4xl mx-auto px-4 py-8">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="text-center md:text-left">
+                    <h2 class="text-lg font-bold">CODTECH IT SOLUTIONS</h2>
+                    </div>
+                <div class="text-center md:text-right">
+                    <p class="text-sm text-gray-400">Data: Open-Meteo API</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // --- Configuration ---
+        const GEMINI_API_KEY = ""; // Injected by environment
+        const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
+        
+        // --- DOM Elements ---
+        const cityInput = document.getElementById('cityInput');
+        const loader = document.getElementById('loader');
+        const errorBox = document.getElementById('errorBox');
+        const weatherContainer = document.getElementById('weatherContainer');
+        
+        // Modal Elements
+        const aiModal = document.getElementById('aiModal');
+        const aiModalContent = document.getElementById('aiModalContent');
+        const modalLoader = document.getElementById('modalLoader');
+        const modalTextContent = document.getElementById('modalTextContent');
+
+        // State
+        let currentWeatherData = null;
+        let currentCityName = "";
+
+        // WMO Weather Codes Mapping
+        const weatherCodes = {
+            0: { desc: "Clear Sky", icon: "fa-sun", color: "text-yellow-500" },
+            1: { desc: "Mainly Clear", icon: "fa-cloud-sun", color: "text-yellow-400" },
+            2: { desc: "Partly Cloudy", icon: "fa-cloud-sun", color: "text-gray-400" },
+            3: { desc: "Overcast", icon: "fa-cloud", color: "text-gray-500" },
+            45: { desc: "Fog", icon: "fa-smog", color: "text-gray-400" },
+            48: { desc: "Depositing Rime Fog", icon: "fa-smog", color: "text-gray-400" },
+            51: { desc: "Light Drizzle", icon: "fa-cloud-rain", color: "text-blue-400" },
+            53: { desc: "Moderate Drizzle", icon: "fa-cloud-rain", color: "text-blue-500" },
+            55: { desc: "Dense Drizzle", icon: "fa-cloud-showers-heavy", color: "text-blue-600" },
+            61: { desc: "Slight Rain", icon: "fa-cloud-rain", color: "text-blue-400" },
+            63: { desc: "Moderate Rain", icon: "fa-cloud-rain", color: "text-blue-500" },
+            65: { desc: "Heavy Rain", icon: "fa-cloud-showers-heavy", color: "text-blue-700" },
+            71: { desc: "Slight Snow", icon: "fa-snowflake", color: "text-sky-300" },
+            73: { desc: "Moderate Snow", icon: "fa-snowflake", color: "text-sky-400" },
+            75: { desc: "Heavy Snow", icon: "fa-snowflake", color: "text-sky-500" },
+            95: { desc: "Thunderstorm", icon: "fa-bolt", color: "text-yellow-600" },
+            96: { desc: "Thunderstorm + Hail", icon: "fa-bolt", color: "text-yellow-700" },
+            99: { desc: "Heavy Thunderstorm", icon: "fa-bolt", color: "text-yellow-800" },
+        };
+
+        // --- Core Functions ---
+
+        // 1. Geocoding (City Name -> Lat/Lon)
+        async function handleSearch() {
+            const city = cityInput.value.trim();
+            if (!city) return;
+
+            resetUI();
+            loader.classList.remove('hidden');
+
+            try {
+                // Fetch Coordinates
+                const geoRes = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=en&format=json`);
+                const geoData = await geoRes.json();
+
+                if (!geoData.results || geoData.results.length === 0) {
+                    throw new Error("City not found");
+                }
+
+                const { latitude, longitude, name, country } = geoData.results[0];
+                currentCityName = `${name}, ${country}`;
+
+                // Fetch Weather
+                await fetchWeather(latitude, longitude);
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                loader.classList.add('hidden');
+            }
+        }
+
+        // 2. Weather Fetching (Lat/Lon -> Weather Data)
+        async function fetchWeather(lat, lon) {
+            try {
+                const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=relativehumidity_2m&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
+                
+                const res = await fetch(url);
+                if (!res.ok) throw new Error("Weather service unavailable");
+                
+                const data = await res.json();
+                currentWeatherData = data;
+                
+                updateUI(data);
+
+            } catch (error) {
+                showError("Could not fetch weather data.");
+            }
+        }
+
+        // 3. User Location
+        function getUserLocation() {
+            if (navigator.geolocation) {
+                resetUI();
+                loader.classList.remove('hidden');
+                cityInput.value = "Locating...";
+                
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        currentCityName = "Your Location";
+                        fetchWeather(latitude, longitude).then(() => {
+                            loader.classList.add('hidden');
+                        });
+                    },
+                    (error) => {
+                        loader.classList.add('hidden');
+                        showError("Location access denied or unavailable.");
+                        cityInput.value = "";
+                    }
+                );
+            } else {
+                showError("Geolocation is not supported by your browser.");
+            }
+        }
+
+        // --- UI Updates ---
+
+        function updateUI(data) {
+            // Unpack Data
+            const current = data.current_weather;
+            const daily = data.daily;
+            const weatherCode = current.weathercode;
+
+            // Get Icon/Desc from map (default to cloudy if unknown)
+            const weatherInfo = weatherCodes[weatherCode] || { desc: "Unknown", icon: "fa-cloud", color: "text-gray-400" };
+
+            // Update DOM
+            document.getElementById('cityName').textContent = currentCityName;
+            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+            document.getElementById('tempValue').textContent = Math.round(current.temperature);
+            document.getElementById('windValue').textContent = `${current.windspeed} km/h`;
+            
+            // Note: OpenMeteo current_weather doesn't give humidity directly, need to approximate from hourly or just hide it. 
+            // We fetched hourly relativehumidity_2m. Let's take the current hour's humidity.
+            const hourIndex = new Date().getHours();
+            const humidity = data.hourly.relativehumidity_2m[hourIndex] || "--";
+            document.getElementById('humidityValue').textContent = `${humidity}%`;
+
+            document.getElementById('maxTempValue').textContent = `${Math.round(daily.temperature_2m_max[0])}°C`;
+            document.getElementById('minTempValue').textContent = `${Math.round(daily.temperature_2m_min[0])}°C`;
+            
+            // Icon & Description
+            document.getElementById('weatherDesc').textContent = weatherInfo.desc;
+            const iconEl = document.getElementById('weatherIcon');
+            iconEl.className = `fa-solid ${weatherInfo.icon} text-6xl md:text-7xl animate-float ${weatherInfo.color} drop-shadow-lg`;
+
+            // Show Container
+            weatherContainer.classList.remove('hidden');
+        }
+
+        function resetUI() {
+            weatherContainer.classList.add('hidden');
+            errorBox.classList.add('hidden');
+        }
+
+        function showError(msg) {
+            document.getElementById('errorText').textContent = msg;
+            errorBox.classList.remove('hidden');
+        }
+
+        // --- AI Features (Gemini) ---
+async function openAIModal() {
+            if (!currentWeatherData) return;
+
+            aiModal.classList.remove('hidden');
+            aiModalContent.classList.remove('modal-fade-out');
+            aiModalContent.classList.add('modal-fade-in');
+            
+            // Reset Modal Content
+            modalTextContent.innerHTML = '';
+            modalLoader.classList.remove('hidden');
+
+            // Build Prompt
+            const weather = weatherCodes[currentWeatherData.current_weather.weathercode].desc;
+            const temp = currentWeatherData.current_weather.temperature;
+            const wind = currentWeatherData.current_weather.windspeed;
+            
+            const prompt = `
+                Act as a charismatic TV weatherman.
+                The weather in ${currentCityName} is ${weather}, ${temp}°C, with winds at ${wind} km/h.
+                
+                Please generate a short HTML response (no markdown, just tags) with:
+                1. <p><strong>The Report:</strong> A funny/dramatic 2-sentence summary of the weather.</p>
+                2. <p><strong>Outfit Advice:</strong> What to wear (be specific!).</p>
+                3. <p><strong>Activity:</strong> One good activity for this weather.</p>
+            `;
+
+            try {
+                const response = await callGeminiAPI(prompt);
+                modalLoader.classList.add('hidden');
+                modalTextContent.innerHTML = response;
+            } catch (err) {
+                console.error(err);
+                modalLoader.classList.add('hidden');
+                modalTextContent.innerHTML = `<p class="text-red-500">The AI weatherman is currently on a coffee break. (Error: ${err.message})</p>`;
+            }
+        }
+
+        async function callGeminiAPI(userPrompt) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+            const payload = { contents: [{ parts: [{ text: userPrompt }] }] };
+
+            const delays = [1000, 2000, 4000];
+            for (let i = 0; i <= 3; i++) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!res.ok) throw new Error(`API Error ${res.status}`);
+                    const data = await res.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "No forecast available.";
+                } catch (err) {
+                    if (i === 3) throw err;
+                    await new Promise(r => setTimeout(r, delays[i]));
+                }
+            }
+        }
+
+        function closeModal() {
+            aiModalContent.classList.remove('modal-fade-in');
+            aiModalContent.classList.add('modal-fade-out');
+            setTimeout(() => aiModal.classList.add('hidden'), 250);
+        }
+
+        // Event Listeners
+        cityInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleSearch();
+        });
+        
+        aiModal.addEventListener('click', (e) => {
+            if (e.target === aiModal) closeModal();
+        });
+
+    </script>
+</body>
+</html>
