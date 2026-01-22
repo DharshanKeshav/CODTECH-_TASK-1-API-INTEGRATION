@@ -1,16 +1,9 @@
 # CODTECH-_TASK-1-API-INTEGRATION
 "A modern, responsive weather web application that provides real-time weather data for cities worldwide using the Open-Meteo API, with an interactive UI and an AI-powered weather assistant."
 
-Perfect 👍
-Here is a **professional, internship-ready README.md** you can **copy–paste directly** into GitHub.
-
----
-
 # 🌦️ Global Weather Hub
 
 A modern, responsive **weather web application** that provides real-time weather data for cities worldwide using the **Open-Meteo API**, with an interactive UI and an AI-powered weather assistant.
-
-
 
 ## 📌 Project Overview
 
@@ -79,4 +72,7 @@ const GEMINI_API_KEY = "YOUR_API_KEY_HERE";
 
 
 ## 📸 Screenshots 
+
+<img width="800" height="897" alt="image" src="https://github.com/user-attachments/assets/0d915004-9246-4cfb-8e45-c5cdde6e8f3d" />
+
 
